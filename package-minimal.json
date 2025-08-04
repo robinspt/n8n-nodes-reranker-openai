@@ -1,30 +1,23 @@
 {
-  "name": "n8n-nodes-reranker-openai",
-  "version": "0.1.4",
-  "description": "n8n community node for OpenAI-compatible reranking services",
+  "name": "n8n-nodes-reranker-openai-minimal",
+  "version": "0.1.0",
+  "description": "Minimal test for n8n community node",
   "keywords": [
-    "n8n-community-node-package",
-    "openai",
-    "reranker",
-    "ai",
-    "machine-learning"
+    "n8n-community-node-package"
   ],
   "license": "MIT",
   "homepage": "https://github.com/robinspt/n8n-nodes-reranker-openai",
   "author": {
-    "name": "n8n Community",
-    "email": "community@n8n.io"
+    "name": "Test Author",
+    "email": "test@example.com"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/robinspt/n8n-nodes-reranker-openai.git"
   },
-  "engines": {
-    "node": ">=20.15"
-  },
   "main": "index.js",
   "scripts": {
-    "build": "npx rimraf dist && tsc && gulp build:icons",
+    "build": "tsc && gulp build:icons",
     "dev": "tsc --watch",
     "format": "prettier nodes credentials --write",
     "lint": "eslint nodes credentials package.json",
@@ -37,18 +30,16 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "nodes": [
-      "dist/nodes/RerankerOpenAI/RerankerOpenAi.node.js"
+      "dist/nodes/RerankerOpenAI/MinimalTest.node.js"
     ]
   },
   "devDependencies": {
     "@typescript-eslint/parser": "~8.32.0",
-    "eslint": "^8.57.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.3",
-    "gulp": "^5.0.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.2"
-  },
-  "peerDependencies": {
-    "n8n-workflow": "*"
+    "eslint": "~9.17.0",
+    "eslint-plugin-n8n-nodes-base": "~1.19.0",
+    "gulp": "^4.0.2",
+    "n8n-workflow": "~1.105.0",
+    "prettier": "^3.4.2",
+    "typescript": "~5.7.2"
   }
 }
