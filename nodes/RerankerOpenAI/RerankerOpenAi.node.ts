@@ -6,7 +6,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionType } from 'n8n-workflow';
 
-export class RerankerOpenAI implements INodeType {
+export class RerankerOpenAi implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Reranker OpenAI',
 		name: 'rerankerOpenAi',
