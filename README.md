@@ -6,12 +6,7 @@ The Reranker OpenAI node allows you to reorder documents by relevance to a given
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
-[Installation](#installation)
-[Operations](#operations)
-[Credentials](#credentials)
-[Compatibility](#compatibility)
-[Usage](#usage)
-[Resources](#resources)
+[Installation](#installation) | [Operations](#operations) | [Credentials](#credentials) | [Compatibility](#compatibility) | [Usage](#usage) | [Resources](#resources)
 
 ## Installation
 
@@ -104,6 +99,12 @@ The node expects input data with an array of documents to rerank. Configure thes
   "total_results": 2
 }
 ```
+
+## Supported Services
+
+- **OpenAI**: When reranking APIs become available
+- **SiliconFlow**: Use models like `Qwen/Qwen3-Reranker-8B`
+- **Custom APIs**: Any service implementing the OpenAI reranking API format
 
 ## Resources
 

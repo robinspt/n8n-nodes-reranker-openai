@@ -10,7 +10,7 @@ export class OpenAIApi implements ICredentialType {
 
 	displayName = 'OpenAI API';
 
-	documentationUrl = 'https://platform.openai.com/docs/api-reference/authentication';
+	documentationUrl = 'openai';
 
 	properties: INodeProperties[] = [
 		{
@@ -20,16 +20,14 @@ export class OpenAIApi implements ICredentialType {
 			typeOptions: { password: true },
 			required: true,
 			default: '',
-			description: 'API key for the OpenAI-compatible service',
 		},
 		{
 			displayName: 'Base URL',
 			name: 'url',
 			type: 'string',
-			required: true,
 			default: 'https://api.openai.com',
-			description: 'Base URL for the OpenAI-compatible API endpoint',
-			placeholder: 'https://api.openai.com',
+			description: 'Base URL for the OpenAI-compatible API',
+			required: true,
 		},
 	];
 
@@ -44,9 +42,8 @@ export class OpenAIApi implements ICredentialType {
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: '={{ $credentials.url }}',
+			baseURL: '={{$credentials.url}}',
 			url: '/v1/models',
-			method: 'GET',
 		},
 	};
 }

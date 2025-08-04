@@ -1,2 +1,2 @@
-// This file is required by n8n but can be empty for community nodes
-// The actual node exports are defined in package.json under the "n8n" field
+// This file is required by n8n to load the community node package
+// It should be empty as all exports are handled through the package.json n8n configuration
