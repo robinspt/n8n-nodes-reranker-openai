@@ -1,18 +1,24 @@
 # n8n-nodes-reranker-openai
 
-This is an n8n community node that provides OpenAI-compatible reranking functionality for your n8n workflows.
+This is an n8n community node that provides OpenAI-compatible reranking functionality for your n8n AI workflows.
 
-The Reranker OpenAI node allows you to reorder documents by relevance to a given query using OpenAI's reranking API or any compatible service.
+The Reranker OpenAI node allows you to reorder documents by relevance to a given query using OpenAI's reranking API or any compatible service. It implements the LangChain `BaseDocumentCompressor` interface for seamless integration with AI workflows.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
-[Installation](#installation) | [Operations](#operations) | [Credentials](#credentials) | [Compatibility](#compatibility) | [Usage](#usage) | [Resources](#resources)
+## 🚀 Features
 
-## Installation
+- **True AI Sub-node**: Implements LangChain `BaseDocumentCompressor` interface
+- **OpenAI Compatible**: Works with OpenAI and other compatible reranking APIs
+- **Seamless Integration**: Designed to work with Vector Stores and AI Agents
+- **Configurable**: Support for different models and top-N results
+- **Error Handling**: Graceful fallbacks and comprehensive error handling
+
+## 📦 Installation
 
 Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
 
-To install this community node package:
+### Quick Install
 
 1. Go to **Settings > Community Nodes** in your n8n instance
 2. Select **Install**
@@ -22,95 +28,96 @@ To install this community node package:
 
 After installation restart n8n to register the new nodes.
 
-## Operations
+## 🔧 Configuration
 
-The Reranker OpenAI node supports the following operation:
+### Credentials
 
-- **Rerank Documents**: Reorder an array of documents by relevance to a given query using OpenAI's reranking API
-
-## Credentials
-
-To use this node, you need to configure OpenAI API credentials:
+Create OpenAI API credentials:
 
 1. Create an OpenAI API account at [platform.openai.com](https://platform.openai.com)
 2. Generate an API key from your OpenAI dashboard
 3. In n8n, create new credentials of type "OpenAI API"
 4. Enter your API key and base URL (default: https://api.openai.com)
 
-The node also supports OpenAI-compatible services by changing the base URL.
+### Node Parameters
 
-## Compatibility
-
-- Minimum n8n version: 0.198.0
-- Tested with n8n versions: 0.198.0+
-
-## Usage
-
-### Input Data Format
-
-The node expects input data with an array of documents to rerank. Configure these parameters:
-
-- **Query**: The search query to rank documents against
 - **Model**: The reranking model to use (default: "rerank-1")
-- **Documents Field**: Name of the field containing the documents array (default: "documents")
-- **Text Field**: Name of the field containing the document text within each document (default: "text")
 - **Top N**: Maximum number of documents to return after reranking (default: 10)
 
-### Example Input
+## 🔄 Usage
 
-```json
-{
-  "documents": [
-    {
-      "text": "Machine learning is a subset of artificial intelligence.",
-      "id": "doc1"
-    },
-    {
-      "text": "Deep learning uses neural networks with multiple layers.",
-      "id": "doc2"
-    },
-    {
-      "text": "Natural language processing helps computers understand text.",
-      "id": "doc3"
-    }
-  ]
-}
+### AI Workflow Integration
+
+The Reranker OpenAI node is designed to work as an AI sub-node in LangChain workflows:
+
+```
+Vector Store → Reranker OpenAI → AI Agent
 ```
 
-### Example Output
+### Example Workflow
 
-```json
-{
-  "reranked_documents": [
-    {
-      "text": "Machine learning is a subset of artificial intelligence.",
-      "id": "doc1",
-      "relevance_score": 0.95,
-      "original_index": 0
-    },
-    {
-      "text": "Deep learning uses neural networks with multiple layers.",
-      "id": "doc2",
-      "relevance_score": 0.87,
-      "original_index": 1
-    }
-  ],
-  "query": "What is machine learning?",
-  "total_results": 2
-}
-```
+1. **Vector Store**: Retrieves relevant documents
+2. **Reranker OpenAI**: Reorders documents by relevance
+3. **AI Agent**: Uses the reranked documents for better responses
 
-## Supported Services
+### Supported Services
 
 - **OpenAI**: When reranking APIs become available
 - **SiliconFlow**: Use models like `Qwen/Qwen3-Reranker-8B`
 - **Custom APIs**: Any service implementing the OpenAI reranking API format
 
-## Resources
+## ⚠️ Current Limitations
 
-- [OpenAI Reranking API Documentation](https://platform.openai.com/docs/guides/reranking)
-- [n8n Community Nodes Documentation](https://docs.n8n.io/integrations/community-nodes/)
+Due to n8n's current architecture, this community node uses `AiTool` connection type instead of the ideal `AiReranker` type. This means:
 
-## License
+- ✅ **Works**: Functions correctly as an AI sub-node
+- ✅ **Integrates**: Can be used in AI workflows
+- ❌ **Connection**: Cannot directly connect to Vector Store's reranker input
+- ❌ **UI**: May not appear in the ideal location in the node palette
+
+We have submitted a feature request to n8n to add `AiReranker` support for community nodes.
+
+## 🛠️ Development
+
+### Building
+
+```bash
+npm install
+npm run build
+```
+
+### Testing
+
+```bash
+npm run lint
+npm test
+```
+
+## 📋 Compatibility
+
+- **Minimum n8n version**: 0.198.0
+- **Tested with n8n versions**: 0.198.0+
+- **Node.js**: >=18.10
+- **LangChain**: Compatible with @langchain/core
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
 
 [MIT](LICENSE.md)
+
+## 🔗 Links
+
+- [n8n Community Nodes Documentation](https://docs.n8n.io/integrations/community-nodes/)
+- [OpenAI Reranking API Documentation](https://platform.openai.com/docs/guides/reranking)
+- [LangChain Document Compressors](https://js.langchain.com/docs/modules/data_connection/retrievers/how_to/contextual_compression)
+
+## 🐛 Issues & Feature Requests
+
+If you encounter any issues or have feature requests, please [open an issue](https://github.com/robinspt/n8n-nodes-reranker-openai/issues) on GitHub.
+
+---
+
+**Note**: This is a community-maintained node and is not officially supported by n8n or OpenAI.
