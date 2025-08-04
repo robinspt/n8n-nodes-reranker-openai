@@ -9,7 +9,7 @@ import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
 export class RerankerOpenAI implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Reranker OpenAI',
-		name: 'rerankerOpenAI',
+		name: 'rerankerOpenAi',
 		icon: 'file:openai.svg',
 		group: ['transform'],
 		version: 1,
