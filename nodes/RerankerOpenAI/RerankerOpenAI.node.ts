@@ -4,7 +4,7 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
-import { NodeConnectionType } from 'n8n-workflow';
+import { NodeConnectionType, NodeOperationError } from 'n8n-workflow';
 
 export class RerankerOpenAI implements INodeType {
 	description: INodeTypeDescription = {
@@ -95,7 +95,7 @@ export class RerankerOpenAI implements INodeType {
 				const documents = inputData[documentsField] as any[];
 
 				if (!documents || !Array.isArray(documents)) {
-					throw new Error(`Field "${documentsField}" not found or is not an array`);
+					throw new NodeOperationError(this.getNode(), `Field "${documentsField}" not found or is not an array`);
 				}
 
 				if (documents.length === 0) {
@@ -117,7 +117,7 @@ export class RerankerOpenAI implements INodeType {
 					} else if (typeof doc === 'object' && doc[textField]) {
 						return doc[textField];
 					} else {
-						throw new Error(`Document at index ${index} does not have field "${textField}"`);
+						throw new NodeOperationError(this.getNode(), `Document at index ${index} does not have field "${textField}"`);
 					}
 				});
 
