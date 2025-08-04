@@ -1,13 +1,18 @@
+import { BaseDocumentCompressor } from '@langchain/core/retrievers/document_compressors';
+import type { DocumentInterface } from '@langchain/core/documents';
+import type { Callbacks } from '@langchain/core/callbacks/manager';
 import {
 	NodeConnectionType,
-	type IExecuteFunctions,
-	type INodeExecutionData,
 	type INodeType,
 	type INodeTypeDescription,
+	type ISupplyDataFunctions,
+	type SupplyData,
 } from 'n8n-workflow';
 
-class OpenAIRerank {
-	// Implement the interface expected by LangChain
+/**
+ * Custom OpenAI-compatible reranker implementation
+ */
+class OpenAIRerank extends BaseDocumentCompressor {
 	private apiKey: string;
 	private baseURL: string;
 	private model: string;
@@ -19,13 +24,18 @@ class OpenAIRerank {
 		model: string;
 		topK?: number;
 	}) {
+		super();
 		this.apiKey = fields.apiKey;
 		this.baseURL = fields.baseURL.replace(/\/$/, ''); // Remove trailing slash
 		this.model = fields.model;
 		this.topK = fields.topK;
 	}
 
-	async compressDocuments(documents: any[], query: string): Promise<any[]> {
+	async compressDocuments(
+		documents: DocumentInterface[],
+		query: string,
+		_callbacks?: Callbacks,
+	): Promise<DocumentInterface[]> {
 		if (documents.length === 0) {
 			return [];
 		}
@@ -35,7 +45,7 @@ class OpenAIRerank {
 			const requestBody = {
 				model: this.model,
 				query,
-				documents: documents.map((doc) => doc.pageContent || doc.text || doc),
+				documents: documents.map((doc) => doc.pageContent),
 				top_n: this.topK || documents.length,
 			};
 
@@ -71,7 +81,7 @@ class OpenAIRerank {
 						return {
 							...originalDoc,
 							metadata: {
-								...(originalDoc.metadata || {}),
+								...originalDoc.metadata,
 								relevanceScore: item.relevance_score,
 							},
 						};
@@ -83,7 +93,8 @@ class OpenAIRerank {
 			// Fallback: return original documents if response format is unexpected
 			return documents;
 		} catch (error) {
-			throw error;
+			// Fallback: return original documents on error
+			return documents;
 		}
 	}
 }
@@ -91,13 +102,18 @@ class OpenAIRerank {
 export class RerankerOpenAI implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Reranker OpenAI',
-		name: 'rerankerOpenAi',
-		icon: 'file:openai.svg',
+		name: 'rerankerOpenAI',
+		icon: { light: 'file:openai.svg', dark: 'file:openai.svg' },
 		group: ['transform'],
 		version: 1,
-		description: 'Use OpenAI-compatible Reranker to reorder documents by relevance to a given query',
+		description:
+			'Use OpenAI-compatible Reranker to reorder documents after retrieval from a vector store by relevance to the given query.',
 		defaults: {
 			name: 'Reranker OpenAI',
+		},
+		requestDefaults: {
+			ignoreHttpStatusErrors: true,
+			baseURL: '={{ $credentials.url }}',
 		},
 		codex: {
 			categories: ['AI'],
@@ -107,14 +123,14 @@ export class RerankerOpenAI implements INodeType {
 			resources: {
 				primaryDocumentation: [
 					{
-						url: 'https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.rerankerOpenAI/',
+						url: 'https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.rerankeropenai/',
 					},
 				],
 			},
 		},
-		// Standard node with main input/output for compatibility
-		inputs: [NodeConnectionType.Main],
-		outputs: [NodeConnectionType.Main],
+		inputs: [],
+		outputs: [NodeConnectionType.AiTool],
+		outputNames: ['Reranker'],
 		credentials: [
 			{
 				name: 'openAIApi',
@@ -123,37 +139,12 @@ export class RerankerOpenAI implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'Query',
-				name: 'query',
-				type: 'string',
-				required: true,
-				default: '',
-				description: 'The search query to rank documents against',
-				placeholder: 'What is machine learning?',
-			},
-			{
 				displayName: 'Model',
 				name: 'modelName',
 				type: 'string',
 				description: 'The model that should be used to rerank the documents',
 				default: 'rerank-1',
 				placeholder: 'rerank-1',
-				required: true,
-			},
-			{
-				displayName: 'Documents Field',
-				name: 'documentsField',
-				type: 'string',
-				default: 'documents',
-				description: 'Name of the field containing the documents array to rerank',
-				required: true,
-			},
-			{
-				displayName: 'Text Field',
-				name: 'textField',
-				type: 'string',
-				default: 'text',
-				description: 'Name of the field containing the document text within each document object',
 				required: true,
 			},
 			{
@@ -170,76 +161,25 @@ export class RerankerOpenAI implements INodeType {
 		],
 	};
 
-	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		const items = this.getInputData();
-		const returnData: INodeExecutionData[] = [];
+	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
+		this.logger.debug('Supply data for reranking OpenAI');
 
-		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-			try {
-				const query = this.getNodeParameter('query', itemIndex) as string;
-				const modelName = this.getNodeParameter('modelName', itemIndex) as string;
-				const documentsField = this.getNodeParameter('documentsField', itemIndex) as string;
-				const textField = this.getNodeParameter('textField', itemIndex) as string;
-				const topN = this.getNodeParameter('topN', itemIndex) as number;
+		const modelName = this.getNodeParameter('modelName', itemIndex) as string;
+		const topN = this.getNodeParameter('topN', itemIndex, 10) as number;
+		const credentials = await this.getCredentials<{
+			apiKey: string;
+			url: string;
+		}>('openAIApi');
 
-				const credentials = await this.getCredentials('openAIApi');
+		const reranker = new OpenAIRerank({
+			apiKey: credentials.apiKey,
+			baseURL: credentials.url,
+			model: modelName,
+			topK: topN,
+		});
 
-				const reranker = new OpenAIRerank({
-					apiKey: credentials.apiKey as string,
-					baseURL: credentials.url as string,
-					model: modelName,
-					topK: topN,
-				});
-
-				// Get documents from input data
-				const inputData = items[itemIndex].json;
-				const documents = inputData[documentsField] as any[];
-
-				if (!documents || !Array.isArray(documents)) {
-					throw new Error(`Field "${documentsField}" not found or is not an array`);
-				}
-
-				if (documents.length === 0) {
-					returnData.push({
-						json: {
-							reranked_documents: [],
-							query,
-							total_results: 0,
-						},
-						pairedItem: itemIndex,
-					});
-					continue;
-				}
-
-				// Use the reranker to process documents
-				const rerankedDocuments = await reranker.compressDocuments(documents, query);
-
-				returnData.push({
-					json: {
-						reranked_documents: rerankedDocuments,
-						query,
-						total_results: rerankedDocuments.length,
-					},
-					pairedItem: itemIndex,
-				});
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: {
-							error: errorMessage,
-							query: this.getNodeParameter('query', itemIndex, ''),
-							reranked_documents: [],
-							total_results: 0,
-						},
-						pairedItem: itemIndex,
-					});
-				} else {
-					throw error;
-				}
-			}
-		}
-
-		return [returnData];
+		return {
+			response: reranker,
+		};
 	}
 }
