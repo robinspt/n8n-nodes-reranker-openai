@@ -243,8 +243,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 🔗 Links
 
 - [n8n Community Nodes Documentation](https://docs.n8n.io/integrations/community-nodes/)
-- [OpenAI Reranking API Documentation](https://platform.openai.com/docs/guides/reranking)
-- [LangChain Document Compressors](https://js.langchain.com/docs/modules/data_connection/retrievers/how_to/contextual_compression)
 
 ## 🐛 Issues & Feature Requests
 
