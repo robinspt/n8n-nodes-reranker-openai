@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2025-01-06
+
+### Removed
+- **Project Cleanup**: Removed all files unrelated to building the rerank community node
+  - Deleted workflow development temporary files (`code_node_reranker.js`, `fixed_code_node_reranker.js`, etc.)
+  - Removed test and debug files (`test-*.js`, `debug-*.js`, `simple-*.js`)
+  - Cleaned up unnecessary documentation and template files
+  - Removed development scripts and configuration files
+- **Repository Maintenance**: Streamlined project structure for better maintainability
+
+### Kept
+- Core node implementation (`nodes/`, `credentials/`, `dist/`)
+- Essential project files (`package.json`, `tsconfig.json`, `gulpfile.js`, `index.js`)
+- Documentation (`README.md`, `CHANGELOG.md`, `LICENSE.md`)
+- Working examples (`examples/` directory with HTTP+Code workaround)
+
 ## [0.8.1] - 2025-01-06
 
 ### Changed
