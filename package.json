@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-reranker-openai",
-  "version": "0.7.3",
-  "description": "n8n community node for OpenAI-compatible reranking services - True AI Sub-node",
+  "version": "0.8.0",
+  "description": "n8n community node for OpenAI-compatible reranking services - Currently requires HTTP+Code workaround",
   "keywords": [
     "n8n-community-node-package",
     "openai",

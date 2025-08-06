@@ -1,0 +1,224 @@
+{
+  "name": "Reranker Workflow Example",
+  "description": "Complete working example of document reranking using HTTP Request and Code nodes",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [100, 300],
+      "id": "chat-trigger",
+      "name": "When chat message received"
+    },
+    {
+      "parameters": {
+        "mode": "load",
+        "mongoCollection": {
+          "__rl": true,
+          "value": "your_collection_name",
+          "mode": "list"
+        },
+        "embedding": "embedding_vector",
+        "metadata_field": "metadata",
+        "vectorIndexName": "vector_index",
+        "prompt": "={{ $('When chat message received').first().json.chatInput }}",
+        "topK": 10,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreMongoDBAtlas",
+      "typeVersion": 1.3,
+      "position": [300, 300],
+      "id": "vector-store",
+      "name": "MongoDB Atlas Vector Store",
+      "credentials": {
+        "mongoDb": {
+          "id": "your-mongodb-credential-id",
+          "name": "MongoDB Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "=Qwen/Qwen3-Embedding-8B",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [300, 500],
+      "id": "embedding",
+      "name": "Qwen3-Embedding",
+      "credentials": {
+        "openAiApi": {
+          "id": "your-siliconflow-credential-id",
+          "name": "SiliconFlow API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Document Processor - Extract and format documents from Vector Store\nconst inputItems = $input.all();\nconst userQuery = $('When chat message received').first().json.chatInput;\n\nconsole.log('=== Document Processor Started ===');\nconsole.log('Input items count:', inputItems.length);\nconsole.log('User query:', userQuery);\n\nif (!inputItems || inputItems.length === 0) {\n  return [{\n    json: {\n      error: 'No input data received',\n      documents: [],\n      query: userQuery,\n      chatInput: userQuery\n    }\n  }];\n}\n\nconst processedDocuments = [];\nfor (const item of inputItems) {\n  if (item.json && item.json.document) {\n    const doc = item.json.document;\n    let pageContent = '';\n    const metadata = doc.metadata || {};\n    const score = item.json.score || 0;\n    \n    // Extract content from different possible locations\n    if (metadata.embedding_text) {\n      pageContent = metadata.embedding_text;\n    } else if (metadata.content && metadata.content.main_text) {\n      pageContent = metadata.content.main_text;\n    } else if (doc.pageContent) {\n      pageContent = typeof doc.pageContent === 'string' ? doc.pageContent : JSON.stringify(doc.pageContent);\n    }\n    \n    if (pageContent && pageContent.trim() !== '' && pageContent !== '[object Object]') {\n      processedDocuments.push({\n        pageContent: pageContent,\n        metadata: {\n          ...metadata,\n          similarity_score: score\n        }\n      });\n    }\n  }\n}\n\nconsole.log(`Processed ${processedDocuments.length} valid documents`);\n\n// Sort by similarity score (descending)\nprocessedDocuments.sort((a, b) => {\n  const scoreA = a.metadata.similarity_score || 0;\n  const scoreB = b.metadata.similarity_score || 0;\n  return scoreB - scoreA;\n});\n\nreturn [{\n  json: {\n    query: userQuery,\n    documents: processedDocuments,\n    chatInput: userQuery,\n    total_documents: processedDocuments.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "id": "document-processor",
+      "name": "Document Processor"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.siliconflow.cn/v1/rerank",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"Qwen/Qwen3-Reranker-8B\",\n  \"query\": \"{{ $json.query }}\",\n  \"documents\": {{ JSON.stringify($json.documents.map(doc => doc.pageContent)) }},\n  \"top_n\": 3\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "id": "rerank-api",
+      "name": "SiliconFlow Rerank API",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "your-siliconflow-bearer-credential-id",
+          "name": "SiliconFlow Bearer Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Result Processor - Process rerank API response\nconst rerankResponse = $input.first().json;\nconst originalDocuments = $('Document Processor').first().json.documents;\nconst userQuery = $('Document Processor').first().json.query;\n\nconsole.log('=== Result Processor Started ===');\nconsole.log('Rerank API Response:', JSON.stringify(rerankResponse, null, 2));\nconsole.log('Original documents count:', originalDocuments.length);\n\nif (originalDocuments.length === 0) {\n  return [{\n    json: {\n      chatInput: userQuery,\n      query: userQuery,\n      error: 'No original documents found',\n      context: '没有找到原始文档数据。',\n      systemContext: `用户问题：${userQuery}\\n\\n错误：没有找到原始文档数据。`\n    }\n  }];\n}\n\nlet rerankedDocuments = [];\nlet contextText = '';\n\nif (rerankResponse.results && Array.isArray(rerankResponse.results)) {\n  console.log('Processing rerank results...');\n  \n  rerankedDocuments = rerankResponse.results\n    .filter(item => \n      typeof item.index === 'number' && \n      item.index >= 0 && \n      item.index < originalDocuments.length\n    )\n    .sort((a, b) => b.relevance_score - a.relevance_score)\n    .map(item => {\n      const originalDoc = originalDocuments[item.index];\n      return {\n        pageContent: originalDoc.pageContent,\n        metadata: {\n          ...originalDoc.metadata,\n          relevance_score: item.relevance_score,\n          original_index: item.index,\n          rerank_status: 'success'\n        }\n      };\n    });\n\n  // Build context text for AI Agent\n  contextText = rerankedDocuments.map((doc, index) => {\n    const metadata = doc.metadata;\n    let docInfo = `【文档${index + 1}】`;\n    \n    if (metadata.id) {\n      docInfo += ` 条款${metadata.id}`;\n    }\n    if (metadata.standard_name) {\n      docInfo += ` - ${metadata.standard_name}`;\n    }\n    if (metadata.standard_number) {\n      docInfo += ` (${metadata.standard_number})`;\n    }\n    if (metadata.relevance_score) {\n      docInfo += ` [相关度: ${(metadata.relevance_score * 100).toFixed(1)}%]`;\n    }\n    \n    return `${docInfo}\\n内容：${doc.pageContent}\\n`;\n  }).join('\\n---\\n');\n\n} else {\n  console.warn('Invalid rerank response, using original documents');\n  rerankedDocuments = originalDocuments.slice(0, 3);\n  contextText = rerankedDocuments.map((doc, index) => {\n    const metadata = doc.metadata;\n    let docInfo = `【文档${index + 1}】`;\n    \n    if (metadata.id) {\n      docInfo += ` 条款${metadata.id}`;\n    }\n    if (metadata.standard_name) {\n      docInfo += ` - ${metadata.standard_name}`;\n    }\n    \n    return `${docInfo}\\n内容：${doc.pageContent}\\n`;\n  }).join('\\n---\\n');\n}\n\nconsole.log(`Processed ${rerankedDocuments.length} reranked documents`);\n\nreturn [{\n  json: {\n    chatInput: userQuery,\n    query: userQuery,\n    reranked_documents: rerankedDocuments,\n    total_results: rerankedDocuments.length,\n    context: contextText,\n    systemContext: `用户问题：${userQuery}\\n\\n相关规范文档：\\n${contextText}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "id": "result-processor",
+      "name": "Result Processor"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "=你是一个规范查询助手。\\n\\n{{ $json.systemContext }}\\n\\n请基于以上文档回答用户问题，要求：\\n1. 提供准确、详细的回答\\n2. 标明信息来源的具体条款编号\\n3. 如果文档中没有直接相关信息，请明确说明\\n4. 按相关度优先使用排序靠前的文档"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [1100, 300],
+      "id": "ai-agent",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [1100, 500],
+      "id": "chat-model",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "your-deepseek-credential-id",
+          "name": "DeepSeek API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "MongoDB Atlas Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB Atlas Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Document Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen3-Embedding": {
+      "ai_embedding": [
+        [
+          {
+            "node": "MongoDB Atlas Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Processor": {
+      "main": [
+        [
+          {
+            "node": "SiliconFlow Rerank API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SiliconFlow Rerank API": {
+      "main": [
+        [
+          {
+            "node": "Result Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result Processor": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

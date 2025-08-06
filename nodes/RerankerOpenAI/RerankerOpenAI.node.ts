@@ -9,6 +9,10 @@ import {
 	type SupplyData,
 } from 'n8n-workflow';
 
+// Define AiReranker type for future compatibility
+// This will be available when n8n officially supports community nodes with AiReranker
+const AiReranker = 'ai_reranker' as NodeConnectionType;
+
 /**
  * Custom OpenAI-compatible reranker implementation
  */
@@ -107,7 +111,7 @@ export class RerankerOpenAI implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'Use OpenAI-compatible Reranker to reorder documents after retrieval from a vector store by relevance to the given query.',
+			'Use OpenAI-compatible Reranker to reorder documents after retrieval from a vector store by relevance to the given query. Note: This node currently cannot be used as a reranker due to n8n limitations. Use the HTTP Request + Code node workaround instead.',
 		defaults: {
 			name: 'Reranker OpenAI',
 		},
@@ -129,7 +133,7 @@ export class RerankerOpenAI implements INodeType {
 			},
 		},
 		inputs: [],
-		outputs: [NodeConnectionType.AiTool],
+		outputs: [AiReranker], // Will be NodeConnectionType.AiReranker when officially supported
 		outputNames: ['Reranker'],
 		credentials: [
 			{
@@ -139,12 +143,25 @@ export class RerankerOpenAI implements INodeType {
 		],
 		properties: [
 			{
+				displayName: '⚠️ Important Notice',
+				name: 'notice',
+				type: 'notice',
+				default: '',
+				displayOptions: {
+					show: {},
+				},
+				typeOptions: {
+					theme: 'warning',
+				},
+				description: 'This node currently cannot be used as a reranker because n8n does not support community nodes with AiReranker connection type. Please use the HTTP Request + Code node workaround instead. See README for details.',
+			},
+			{
 				displayName: 'Model',
 				name: 'modelName',
 				type: 'string',
 				description: 'The model that should be used to rerank the documents',
-				default: 'rerank-1',
-				placeholder: 'rerank-1',
+				default: 'Qwen/Qwen3-Reranker-8B',
+				placeholder: 'Qwen/Qwen3-Reranker-8B',
 				required: true,
 			},
 			{

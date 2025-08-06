@@ -1,5 +1,13 @@
 # n8n-nodes-reranker-openai
 
+> **⚠️ IMPORTANT NOTICE: This node is currently NOT FUNCTIONAL**
+>
+> This community node cannot be used as a reranker because n8n does not support community nodes with `AiReranker` connection type.
+>
+> **Please use the [HTTP Request + Code Node Workaround](#-workaround-http-request--code-nodes) instead.**
+>
+> This node will become functional when n8n officially supports community nodes with `AiReranker` connection type.
+
 This is an n8n community node that provides OpenAI-compatible reranking functionality for your n8n AI workflows.
 
 The Reranker OpenAI node allows you to reorder documents by relevance to a given query using OpenAI's reranking API or any compatible service. It implements the LangChain `BaseDocumentCompressor` interface for seamless integration with AI workflows.
@@ -66,16 +74,140 @@ Vector Store → Reranker OpenAI → AI Agent
 - **SiliconFlow**: Use models like `Qwen/Qwen3-Reranker-8B`
 - **Custom APIs**: Any service implementing the OpenAI reranking API format
 
+## 🔧 Workaround: HTTP Request + Code Nodes
+
+Since the dedicated reranker node cannot be used, here's a working implementation using HTTP Request and Code nodes:
+
+### Workflow Structure
+```
+Chat Trigger → MongoDB Vector Store → Document Processor (Code) → HTTP Request (Rerank API) → Result Processor (Code) → AI Agent
+                        ↑                                                                                                    ↑
+Qwen3-Embedding ────────┘                                                                                                    │
+DeepSeek Chat Model ─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. Document Processor (Code Node)
+```javascript
+// Process MongoDB Vector Store output and prepare for rerank API
+const inputItems = $input.all();
+const userQuery = $('When chat message received').first().json.chatInput;
+
+const processedDocuments = [];
+for (const item of inputItems) {
+  if (item.json && item.json.document) {
+    const doc = item.json.document;
+    let pageContent = '';
+
+    // Extract content from metadata if needed
+    if (doc.metadata && doc.metadata.embedding_text) {
+      pageContent = doc.metadata.embedding_text;
+    } else if (doc.pageContent) {
+      pageContent = doc.pageContent;
+    }
+
+    if (pageContent && pageContent.trim() !== '') {
+      processedDocuments.push({
+        pageContent: pageContent,
+        metadata: {
+          ...doc.metadata,
+          similarity_score: item.json.score || 0
+        }
+      });
+    }
+  }
+}
+
+return [{
+  json: {
+    query: userQuery,
+    documents: processedDocuments,
+    chatInput: userQuery
+  }
+}];
+```
+
+### 2. HTTP Request Node Configuration
+- **Method**: POST
+- **URL**: `https://api.siliconflow.cn/v1/rerank`
+- **Authentication**: Bearer Token
+- **Headers**: `Content-Type: application/json`
+- **Body** (JSON):
+```json
+{
+  "model": "Qwen/Qwen3-Reranker-8B",
+  "query": "{{ $json.query }}",
+  "documents": {{ JSON.stringify($json.documents.map(doc => doc.pageContent)) }},
+  "top_n": 3
+}
+```
+
+### 3. Result Processor (Code Node)
+```javascript
+// Process rerank API response and format for AI Agent
+const rerankResponse = $input.first().json;
+const originalDocuments = $('Document Processor').first().json.documents;
+const userQuery = $('Document Processor').first().json.query;
+
+let rerankedDocuments = [];
+if (rerankResponse.results && Array.isArray(rerankResponse.results)) {
+  rerankedDocuments = rerankResponse.results
+    .filter(item => item.index >= 0 && item.index < originalDocuments.length)
+    .sort((a, b) => b.relevance_score - a.relevance_score)
+    .map(item => {
+      const originalDoc = originalDocuments[item.index];
+      return {
+        pageContent: originalDoc.pageContent,
+        metadata: {
+          ...originalDoc.metadata,
+          relevance_score: item.relevance_score
+        }
+      };
+    });
+}
+
+const contextText = rerankedDocuments.map((doc, index) => {
+  const metadata = doc.metadata;
+  let docInfo = `【文档${index + 1}】`;
+  if (metadata.id) docInfo += ` 条款${metadata.id}`;
+  if (metadata.standard_name) docInfo += ` - ${metadata.standard_name}`;
+  if (metadata.relevance_score) docInfo += ` [相关度: ${(metadata.relevance_score * 100).toFixed(1)}%]`;
+  return `${docInfo}\n内容：${doc.pageContent}\n`;
+}).join('\n---\n');
+
+return [{
+  json: {
+    chatInput: userQuery,
+    query: userQuery,
+    reranked_documents: rerankedDocuments,
+    context: contextText,
+    systemContext: `用户问题：${userQuery}\n\n相关规范文档：\n${contextText}`
+  }
+}];
+```
+
+### 4. AI Agent System Message
+```
+你是一个规范查询助手。
+
+{{ $json.systemContext }}
+
+请基于以上文档回答用户问题，要求：
+1. 提供准确、详细的回答
+2. 标明信息来源的具体条款编号
+3. 如果文档中没有直接相关信息，请明确说明
+4. 按相关度优先使用排序靠前的文档
+```
+
 ## ⚠️ Current Limitations
 
-Due to n8n's current architecture, this community node uses `AiTool` connection type instead of the ideal `AiReranker` type. This means:
+This community node is currently **NOT FUNCTIONAL** due to n8n's architecture limitations:
 
-- ✅ **Works**: Functions correctly as an AI sub-node
-- ✅ **Integrates**: Can be used in AI workflows
-- ❌ **Connection**: Cannot directly connect to Vector Store's reranker input
-- ❌ **UI**: May not appear in the ideal location in the node palette
+- ❌ **Cannot be used**: n8n doesn't support community nodes with `AiReranker` connection type
+- ❌ **No direct connection**: Cannot connect to Vector Store's reranker input
+- ✅ **Workaround available**: Use HTTP Request + Code nodes (see above)
+- ✅ **Future ready**: Will work when n8n adds official support
 
-We have submitted a feature request to n8n to add `AiReranker` support for community nodes.
+We are waiting for n8n to add `AiReranker` support for community nodes.
 
 ## 🛠️ Development
 
